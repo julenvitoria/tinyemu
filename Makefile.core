@@ -1,0 +1,363 @@
+# Retro-Go SD external core — TinyEMU x86 DOS.
+#
+#   make -f Makefile.core          build + pack -> dos.bin
+#   make -f Makefile.core clean
+#
+# Mirrors the structure of the SDK template's root Makefile (identity here,
+# rules in sdk/Makefile). The bare-metal CPU harness is a SEPARATE build:
+# see the default Makefile / test_core.elf. Keeping them apart is deliberate --
+# the harness must stay free of firmware ABI surface so it remains a clean
+# measurement tier.
+
+PROJECT_KIND ?= core
+
+CORE_NAME  := dos
+CORE_ENTRY := app_main
+
+CORE_C_SOURCES := \
+src/main.c \
+x86_cpu.c \
+x86_io.c \
+x86_opl.c \
+lib/emu8950/emu8950.c \
+x86_mem.c \
+x86_arena.c \
+x86_pager.c \
+x86_pgfile.c \
+x86_seam.c \
+x86_pmode.c \
+x86_nor.c \
+x86_video.c \
+x86_video_planar.c \
+x86_osk.c \
+x86_hle.c \
+x86_bios.c \
+x86_dos.c \
+x86_ems.c \
+x86_settings.c \
+x86_cfg.c \
+lib/FatFs/ff.c \
+lib/FatFs/ffunicode.c \
+x86_disk.c \
+x86_profile.c \
+x86_probe.c \
+x86_zones.c \
+x86_vprof.c
+
+CORE_ASM_SOURCES := \
+cpu_exec.S \
+cga_blit.S \
+hw_accel.S
+
+# Two-segment layout: RAM_EMU + ITCM (the interpreter hot loop).
+CORE_LDSCRIPT := dos_core.ld
+
+CORE_C_INCLUDES := -I. -Ilib/FatFs -Ilib/emu8950
+
+# Match the template's release-firmware layout. COVERFLOW fields sit BEFORE
+# cheat_* in retro_emulator_file_t, so CHEAT_CODES with COVERFLOW=0 misaligns
+# pointers -- our old Makefile had exactly that combination.
+# Anti-aliased text: 2 KB for font4x8aa.h in place of font4x8.h, plus its
+# per-frame CLUT allocator. OFF by default -- see the X86_TEXT_AA comment in
+# x86_video.c for the RAM_EMU headroom measurement that makes this a choice
+# rather than a feature you simply add.
+X86_TEXT_AA ?= 0
+# An AA core must DROP the 1-bit table to pay for the 2-bit one; there is not
+# room for both. Capture builds use `make sdcard X86_TEXT_AA=1`.
+ifeq ($(X86_TEXT_AA),1)
+X86_TEXT_BILEVEL_FONT ?= 0
+else
+X86_TEXT_BILEVEL_FONT ?= 1
+endif
+
+# Per-opcode DWT cycle profiling; see Makefile for why it is off by default.
+# THE GRANULE SEAM (x86_seam.c). 0 is the NEGATIVE CONTROL: no seam prologue is
+# emitted at the fold sites and no flush runs at the instruction boundary, so a
+# straddling 16/32-bit access reads and writes the slack past the low granule
+# instead of its neighbour -- the defect itself. tests/test_seam.py --negative
+# builds this and asserts the wrong answers, because a test that cannot be made
+# to fail is not a test. Never ship 0.
+# PSP SHIFT, in paragraphs, for the granule-seam acceptance test only. 0 is the
+# shipping path. 15 puts the PSP 256 bytes off a 4 KB boundary, which is the
+# placement that silently corrupted Wolfenstein 3-D before the seam was fixed.
+# See x86_dos.c and tests/test_seam.py.
+X86_DOS_PSP_SHIFT ?= 0
+
+# INT 21h AH=4Bh (EXEC). AL=00h (load and execute) and AL=03h (load overlay).
+# ON in the shipping core.
+#
+# It was off for several passes because honouring AL=00h was recorded as
+# killing Wolfenstein 3-D (guest_exit_reason=5 MEM_FAULT, guest_insns_total=0,
+# golden gate: no picture), attributed to the pager having nowhere to put a
+# child image's ~30 untouched pages. THAT NO LONGER REPRODUCES, and the
+# re-measurement says the attribution was wrong twice over:
+#
+#   * WOLF3D never calls AH=4Bh in the graded window at all. Measured over
+#     340 M instructions at tier 2: x86_dos_execs=0, x86_dos_overlays=0,
+#     x86_dos_load_bytes=109,927 (its OWN image, loaded by the launch path at
+#     x86_dos.c:1070, which is dos_load_mz() and not the EXEC switch). A title
+#     that never reaches the code cannot be killed by it.
+#   * The flag costs NO pager frames. x86_pg_frames_total is 159 with it on
+#     and 159 with it off; __CORE_BSS_END__ moves 0x2405EBF8 -> 0x2405F120
+#     (+1,320 B) and that fits the slack the pool already had. The recorded
+#     "insns_total=0 with every other counter healthy" is the exact signature
+#     of the RAM_EMU starvation trap in STATUS.md's Budgets row, which bit
+#     three instrumented builds in the same session.
+#
+# Graded on the flip: WOLF3D golden 0.000%, ALLEYCAT 0.874% (pre-existing).
+X86_DOS_EXEC ?= 1
+
+X86_SEAM_FIX ?= 1
+X86_CODE_THREAD_UNSAFE ?= 0
+
+X86_PROFILE ?= 0
+
+# Frame-loop phase/zone wall-time accounting (x86_zones.h). Off by default like
+# every other instrument. Unlike X86_PROFILE this one is per-FRAME and
+# per-SERVICE-CALL rather than per guest instruction, so it perturbs far less --
+# but "far less" is a measurement, not a claim: x86_zones_calibrate reports the
+# per-transition cost and scripts/profile_all.py prints it in the report.
+X86_ZONES ?= 0
+
+# Video-path cycle attribution (x86_vprof.h). Off by default. Brackets the four
+# phases zones cannot see -- the planar store hook and the Mode Y paint, both of
+# which run INSIDE the interpreter and are therefore charged to the GUEST zone.
+# The STORE bracket fires ~180,000 times a second in Mode Y and is the one that
+# perturbs its own measurement; x86_vprof_calibrate reports what a bracket costs
+# and nothing subtracts it. See the header.
+X86_VPROF ?= 0
+
+# EGA read-shadow rebuild instrument (x86_video_planar.c). Off by default, and
+# SEPARATE from X86_VPROF because X86_VPROF=1 no longer fits: it adds ~1,080 B
+# to RAM_EMU, guest_ram comes back NULL and core_ready stays 0 with no message
+# (reproduced on stock master, KEEN4, tier 2). Five words of bss and one DWT
+# bracket around ega_shadow_rebuild(), which is the KEEN4-wedge suspect.
+X86_EGA_SHPROF ?= 0
+
+# Probe accumulator (x86_probe.h): every service and port the guest touched, and
+# HOW we answered -- implemented, stubbed, defaulted or never modelled. Off by
+# default because it emits ~2.8 KB of RAM_EMU storage; it is per-SERVICE-CALL
+# and per-PORT-ACCESS, never per guest instruction. scripts/probe_report.py
+# builds with it and prints the measured link delta in every report.
+X86_PROBE ?= 0
+
+# How many distinct (kind, id, AH, sub) keys the accumulator holds. 128 keys is
+# 2,848 B of RAM_EMU .bss all in; the busiest title measured here claimed 60.
+#
+# THIS IS A KNOB BECAUSE THE POOL IT COMES OUT OF IS EXACTLY FULL. MEASURED:
+# RAM_EMU has 655,360 B free at the guest_ram claim with the accumulator in,
+# and the 160-frame pool wants 656,640 (stride 4,104, not 4,096) -- 1,280 B
+# short, i.e. ONE FRAME. The core no longer turns that into zero frames (it
+# sizes the claim to the free space and publishes guest_ram_pages_short), and
+# 159 frames measured x86_pg_evictions=0 on WOLF3D, so the default is to keep
+# all 128 keys and pay the frame.
+#
+# X86_PROBE_ENTS=64 saves exactly 1,280 B and buys the 160th frame back, for
+# titles where the pager is the thing under investigation. It is not the
+# default because 64 keys is close to the 60 a real title used, and the
+# accumulator SATURATES: the report says how many keys it refused, but a
+# refused key is a question you cannot see the title asking.
+X86_PROBE_ENTS ?= 128
+
+# CS / interrupt-vector trace rings (x86_cs_log, x86_int_vec_log). Diagnostic,
+# and they live inside L(SET_SREG) -- the path EVERY far CALL, RETF, IRET and
+# interrupt takes. See the Makefile for the measured cost. Off by default;
+# scripts/trace_diff.py and `probe.py --dump x86_cs_log:16x4` need it on.
+X86_CS_LOG ?= 0
+
+# Chrom-ART (DMA2D) offload of the chained mode 13h blit, through the firmware
+# ABI's RGB565 M2M op. OFF by default and it is NOT an instrument -- it is an
+# UNVERIFIABLE optimisation: gwemu models the engine well enough to prove the
+# pixels but runs the transfer synchronously, so neither the timing nor the
+# placement of the wait can be checked below tier 3. The rationale, the price
+# and the strongly-ordered-framebuffer measurement it rests on are in src/main.c
+# on dma2d_blit_hook(). Build with X86_VIDEO_DMA2D=1 to A/B it on hardware.
+X86_VIDEO_DMA2D ?= 0
+
+# How many EXTRA Mode Y display pages to fit, at 65,536 B each. 2 is the
+# hardware layout; 1 still removes the draw-over-displayed hazard; 0 keeps the
+# aliased fold. Grade any rung on the WOLF3D golden AND
+# x86_vga_modey_alias_hits, never on frame rate alone.
+#
+# RUNG 1 IS NOW FREE, AND THAT IS WHY IT IS THE DEFAULT.
+#
+# The 65,536-byte 13h aperture now lives in DTCM (dtcm_state_init(), funded by
+# allocating the mode records first and exactly), so the arena keeps that run:
+# x86_arena_largest 12,288 -> 77,824, MEASURED on hardware, which places one
+# extra page with NO frames donated. x86_pg_frames_total stays 160 and
+# x86_pg_evictions stays 0 -- i.e. Wolf3D fits in conventional memory and does
+# not page, which is what removed its level-load stalls.
+#
+# DO NOT RAISE THIS TO 2 WITHOUT CHECKING x86_arena_largest FIRST. Two extra
+# pages want 131,072 B against the 77,824 that exist, so the shortfall comes
+# out of the pager as donated frames -- silently, and the stalls come back.
+# That is the trade this knob exists to make visible.
+X86_MODEY_EXTRA_PAGES ?= 1
+
+# Pager donation floor (x86_pager.h). Overridable ONLY so a measurement build
+# can force the pager to evict; the shipping default lives in the header.
+X86_PG_DONATE_RESERVE ?=
+
+# Pagefile write-shape micro-benchmark (src/main.c, pgf_bench). One second at
+# title load, and it truncates the pagefile afterwards -- measurement only.
+X86_PGF_BENCH ?= 0
+
+# The .dsk read path, as it was: one f_open/f_close per 512-byte sector. The
+# A/B arm for holding the handle -- measurement only, never shipped at 1.
+X86_DSK_OPEN_PER_CALL ?= 0
+
+# ISA bus time charged to an FM-port access, in PIT ticks (x86_io.c). 1 = one
+# ~0.84 us 8-bit ISA cycle, which is what the AdLib detect's delay loop is
+# calibrated in. 0 is the NEGATIVE CONTROL: the OPL timer then measures the
+# delay in instructions again and WOLF3D/KEEN4 go back to "no AdLib", and with
+# it WOLF3D goes back to never probing 0x22x.
+X86_ISA_IO_TICKS ?= 1
+
+# HOST-SIDE AUDIO PARTITION TEST. 1 replaces every emulated source with a
+# 440 Hz square wave written straight into the firmware's DMA half-buffer, so
+# what reaches the speaker depends on NOTHING in the SB/speaker model. Audible
+# = the host chain (odroid_audio_init -> audio_start_playing -> SAI DMA ->
+# amplifier -> volume) is sound and any silence is the guest's. Silent = the
+# bug is entirely host-side and no amount of DMA-engine work can be heard.
+# Measurement only, never shipped at 1.
+X86_AUDIO_TONE ?= 0
+
+# OPL2 FM TONE GENERATION (x86_opl.c). 1 ships. 0 is the COST CONTROL and the
+# off-switch in one: the register writes are still parsed and the detection
+# answer is unchanged, but x86_opl_render_mix() is not called, so the frame
+# does none of the synthesis. That is the A/B the tier-3 cost number in
+# docs/03 4g was taken from -- the same core, the same workload, one call.
+X86_OPL_FM ?= 1
+
+# FM COST MEASUREMENT (x86_opl.h). 0 ships. 1 keys all nine channels on at core
+# start and brackets the render with DWT->CYCCNT into x86_opl_frame_cycles, so
+# the WORST-CASE per-frame cost can be read on SILICON with probe.py --watch,
+# in the real core, with its code in RAM_EMU and the caches on. It is not a
+# sound setting: at 1 the guest's own music is inaudible under it.
+X86_OPL_BENCH ?= 0
+
+# emu8950's configuration, transcribed from the owner's gnw-doom/Makefile
+# (lines 133-192) and explained in lib/emu8950/README-tinyemu.md. These are
+# NOT ours to tune casually: this exact set is what runs OPL music on this part
+# under retro-go in the G&W Doom port. DOOMX=1 is the one that matters most
+# here -- it gives emu8950 a single STATIC OPL instance instead of calloc(),
+# and this core has no malloc to offer it.
+#
+# -fms-extensions rides along in this list because CORE_C_DEFS is the only
+# hook the SDK makefile offers into CFLAGS and it is pasted in verbatim. It is
+# not optional and it is not a taste: OPL_SLOT embeds `struct SLOT_RENDER`
+# ANONYMOUSLY, which is an MS/plan9 extension and a hard error in plain C11.
+# Enabling it changes nothing for any other file in the build.
+EMU8950_DEFS := \
+-fms-extensions \
+-DUSE_EMU8950_OPL=1 \
+-DDOOMX=1 \
+-DEMU8950_LINEAR=1 \
+-DEMU8950_LINEAR_SKIP=1 \
+-DEMU8950_NO_RATECONV=1 \
+-DEMU8950_NO_TLL=1 \
+-DEMU8950_NO_TIMER=1 \
+-DEMU8950_NO_TEST_FLAG=1 \
+-DEMU8950_NO_PERCUSSION_MODE=1
+
+CORE_C_DEFS := \
+-DX86_ISA_IO_TICKS=$(X86_ISA_IO_TICKS)u \
+-DX86_AUDIO_TONE=$(X86_AUDIO_TONE) \
+-DX86_OPL_FM=$(X86_OPL_FM) \
+-DX86_OPL_BENCH=$(X86_OPL_BENCH) \
+$(EMU8950_DEFS) \
+-DX86_MODEY_EXTRA_PAGES=$(X86_MODEY_EXTRA_PAGES) \
+-DX86_PGF_BENCH=$(X86_PGF_BENCH) \
+-DX86_DSK_OPEN_PER_CALL=$(X86_DSK_OPEN_PER_CALL) \
+$(if $(X86_PG_DONATE_RESERVE),-DX86_PG_DONATE_RESERVE=$(X86_PG_DONATE_RESERVE)u) \
+-DX86_VIDEO_DMA2D=$(X86_VIDEO_DMA2D) \
+-DX86_SEAM_FIX=$(X86_SEAM_FIX) \
+-DX86_CODE_THREAD_UNSAFE=$(X86_CODE_THREAD_UNSAFE) \
+-DX86_DOS_PSP_SHIFT=$(X86_DOS_PSP_SHIFT) \
+-DX86_DOS_EXEC=$(X86_DOS_EXEC) \
+-DX86_PROFILE=$(X86_PROFILE) \
+-DX86_ZONES=$(X86_ZONES) \
+-DX86_VPROF=$(X86_VPROF) \
+-DX86_EGA_SHPROF=$(X86_EGA_SHPROF) \
+-DX86_PROBE=$(X86_PROBE) \
+-DX86_PROBE_ENTS=$(X86_PROBE_ENTS) \
+-DX86_CS_LOG=$(X86_CS_LOG) \
+-DX86_TEXT_AA=$(X86_TEXT_AA) \
+-DX86_TEXT_BILEVEL_FONT=$(X86_TEXT_BILEVEL_FONT) \
+-DPROJECT_KIND_CORE=1 \
+-DCOVERFLOW=1 \
+-DCHEAT_CODES=1 \
+-DMAX_CHEAT_CODES=13 \
+-DIS_LITTLE_ENDIAN
+
+# Our FatFs interprets the guest .dsk; the firmware's FatFs (reached through
+# the SDK bridge, which maps f_* to core_f_*) reads the SD card underneath it.
+# Two instances in one binary, so ours gets its own namespace -- without this
+# they collide on every public entry point.
+CORE_C_DEFS += -Df_mount=dsk_f_mount -Df_open=dsk_f_open -Df_close=dsk_f_close \
+               -Df_read=dsk_f_read -Df_write=dsk_f_write -Df_lseek=dsk_f_lseek \
+               -Df_opendir=dsk_f_opendir -Df_closedir=dsk_f_closedir \
+               -Df_readdir=dsk_f_readdir -Df_stat=dsk_f_stat \
+               -Df_unlink=dsk_f_unlink -Df_sync=dsk_f_sync \
+               -Df_getfree=dsk_f_getfree -Df_truncate=dsk_f_truncate \
+               -Df_rename=dsk_f_rename -Df_mkdir=dsk_f_mkdir \
+               -Df_chdir=dsk_f_chdir -Df_chmod=dsk_f_chmod \
+               -Df_utime=dsk_f_utime -Df_getcwd=dsk_f_getcwd \
+               -Df_setlabel=dsk_f_setlabel -Df_getlabel=dsk_f_getlabel \
+               -Df_expand=dsk_f_expand -Df_forward=dsk_f_forward \
+               -Df_mkfs=dsk_f_mkfs -Df_fdisk=dsk_f_fdisk \
+               -Df_putc=dsk_f_putc -Df_puts=dsk_f_puts -Df_printf=dsk_f_printf \
+               -Df_gets=dsk_f_gets
+
+# One-off defines for a CONTROL BUILD, so grading a guard does not mean editing
+# the source it is meant to grade (and then having to remember to put it back).
+#   make -f Makefile.core clean
+#   make -f Makefile.core pack EXTRA_CFLAGS=-DGUEST_SLICE_WALL_MS=4000000u
+# A changed define does NOT rebuild on its own: clean first, every time.
+CORE_C_DEFS += $(EXTRA_CFLAGS)
+
+
+GNW_CORE_SDK ?= sdk
+BUILD_DIR ?= build/$(PROJECT_KIND)
+
+PACKED_BIN  := $(CORE_NAME).bin
+PAD_LOGO    := src/assets/pad.png
+HEADER_LOGO := src/assets/header.png
+
+include $(GNW_CORE_SDK)/Makefile
+
+# Must come AFTER the include: the first target in a makefile becomes the
+# default goal, so putting these above it made `make -f Makefile.core` build
+# one object file and stop.
+.DEFAULT_GOAL := all
+
+# Generated X86CPUState offsets, shared with the bare-metal build.
+# cpu_exec.S #includes the handler and table sources, and the compiler's
+# generated .d files do not see through that -- so editing a handler left
+# the object stale and packaged a core that did not contain the fix.
+$(BUILD_DIR)/cpu_exec.o: x86_offsets.inc x86_trace.inc cpu_exec_handlers.S \
+                         cpu_exec_handlers_0f.S opcode_table.S \
+                         opcode_0f_table.S
+
+x86_offsets.inc: offset.c x86_cpu.h cutils.h
+	cc -I. -o offset_gen offset.c
+	./offset_gen > $@
+	rm -f offset_gen
+
+#######################################
+# Pack -> /cores/dos.bin, ROMs under /roms/dos/
+#######################################
+PACK_CORE := $(GNW_CORE_SDK)/tools/pack_core.py
+
+.PHONY: pack
+pack: $(TARGET_BIN) $(PAD_LOGO) $(HEADER_LOGO)
+	$(V)$(ECHO) [ PACK CORE ] $(PACKED_BIN)
+	$(V)python3 $(PACK_CORE) \
+		--elf $(TARGET_ELF) --bin $(TARGET_BIN) \
+		--system-name "DOS PC" --dirname dos \
+		--extensions "dsk" \
+		--core-name "TinyEMU x86" \
+		--version 0.1.0 \
+		--pad-logo $(PAD_LOGO) \
+		--header-logo $(HEADER_LOGO) \
+		--out $(PACKED_BIN)

@@ -1,0 +1,41 @@
+# Build products
+*.bin
+*.d
+*.elf
+*.img
+*.o
+build/
+offset_gen
+x86_offsets.inc
+
+# Temporary reference tree: anything we depend on is copied in or a submodule
+references/
+
+# Scratch from earlier bring-up sessions. Kept out of the tree rather than
+# deleted so nothing in flight is lost, but none of it is part of the build.
+scratch/
+dump.s
+dump.txt
+dump2.txt
+make_err.txt
+ops.txt
+tail_0f.txt
+preprocessed.s
+recover.py
+refactor.py
+offset
+offset_test
+offset_test.c
+test.S
+test.gdb
+test_asm.S
+test_macro*.s
+test_macro*.S
+test_pic_opt
+test_pic_opt.c
+test_tbh.S
+__pycache__/
+*.pyc
+
+# Other agents run in git worktrees under here; they are never our content.
+.claude/worktrees/

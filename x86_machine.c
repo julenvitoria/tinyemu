@@ -54,6 +54,10 @@
 #include <sys/time.h>
 #endif
 
+// 2048 entries of 32-bits (8MB / 4KB) = 8192 bytes.
+// Forced into the DTCM via linker section.
+uint32_t guest_page_table[2048] __attribute__((section(".dtcm_bss")));
+
 //#define DEBUG_BIOS
 //#define DUMP_IOPORT
 
@@ -391,23 +395,12 @@ static int pic_get_priority(PICState *s, int mask)
     return priority;
 }
 
+extern int pic_get_irq_asm(PICState *s);
+
 /* return the pic wanted interrupt. return -1 if none */
 static int pic_get_irq(PICState *s)
 {
-    int mask, cur_priority, priority;
-
-    mask = s->irr & ~s->imr;
-    priority = pic_get_priority(s, mask);
-    if (priority < 0)
-        return -1;
-    /* compute current priority */
-    cur_priority = pic_get_priority(s, s->isr);
-    if (priority > cur_priority) {
-        /* higher priority found: an irq should be generated */
-        return priority;
-    } else {
-        return -1;
-    }
+    return pic_get_irq_asm(s);
 }
     
 /* acknowledge interrupt 'irq' */
@@ -2157,6 +2150,8 @@ static VirtMachine *pc_machine_init(const VirtMachineParams *p)
                     p->files[VM_FILE_KERNEL].len,
                     p->cmdline ? p->cmdline : "");
     }
+
+    x86_cpu_sync_port_map(s->cpu_state, s->port_map);
 
     return (VirtMachine *)s;
 }

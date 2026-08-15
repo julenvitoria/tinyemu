@@ -1,0 +1,66 @@
+{
+  "because": "the first sidecar guessed 'roughly the top 80 rows' and named no cause; the geometry is now MEASURED and the cause is the CRTC start address, not the Offset",
+  "history": [
+    {
+      "because": "first capture",
+      "insns": 200000000,
+      "renderer": "EGA 0Dh",
+      "sha256": "bb0c10e5b9a10cc7ec222caf35b7def2893da10f4c90df690d0c40d5bc169897",
+      "shows": "Commander Keen 4 'GOODBYE GALAXY' intro in EGA 0Dh -- HALF HEIGHT. The banner and the planet are drawn correctly across roughly the top 80 rows and everything below is black. This is PLAN.md Queue B item 4, recorded as a picture so the gate fails on it until it is fixed rather than blessing it.",
+      "state": "known_bad",
+      "timeline": "timelines/start-preselected-game.tl",
+      "title": "KEEN4",
+      "verified_at": "2026-08-14T16:56:21+02:00",
+      "verified_by": "agent-QueueB (viewed at capture)",
+      "witness": {
+        "clut_src": "firmware active_clut",
+        "frames_rendered": 1027,
+        "guest_insns_total": 201597045,
+        "ltdc": {
+          "fmt": 5,
+          "lines": 240,
+          "pitch": 320
+        },
+        "x86_arena_largest": 0,
+        "x86_vga_ega_card_offsets": 19456,
+        "x86_vga_latch_miss": 138397,
+        "x86_vga_modey_lost_cache": 0,
+        "x86_vga_modey_lost_nocache": 0,
+        "x86_vga_planar_lost": 275603,
+        "x86_video_mode_byte": 13
+      }
+    }
+  ],
+  "insns": 200000000,
+  "renderer": "EGA 0Dh",
+  "sha256": "bb0c10e5b9a10cc7ec222caf35b7def2893da10f4c90df690d0c40d5bc169897",
+  "shows": "Commander Keen 4 'GOODBYE GALAXY' intro in EGA 0Dh, CLIPPED AT ROW 64. The banner and planet are pixel-correct down to guest row 63 and every row below is black. MEASURED CAUSE: crtc_offset=0x20 (row pitch 64) and crtc_start=15360, against a fitted card of 19456 plane offsets -- (19456-15360)/64 = exactly 64 rows backed. The intro does NOT widen the Offset (Queue B4 predicted 0x40); it displays from a high start, so 200 rows need start+200*64 = 28160 offsets = 112640 bytes against the 77824 fitted. PLAN.md Queue B item 4.",
+  "state": "known_bad",
+  "timeline": "timelines/start-preselected-game.tl",
+  "title": "KEEN4",
+  "verified_at": "2026-08-14T17:30:21+02:00",
+  "verified_by": "agent-QueueB (viewed at capture)",
+  "witness": {
+    "clut_src": "firmware active_clut",
+    "crtc_offset": 32,
+    "crtc_start": 15360,
+    "frames_rendered": 1016,
+    "guest_insns_total": 200003072,
+    "ltdc": {
+      "fmt": 5,
+      "lines": 240,
+      "pitch": 320
+    },
+    "row_pitch": 64,
+    "x86_arena_largest": 0,
+    "x86_vga_ega_card_offsets": 19456,
+    "x86_vga_latch_miss": 132965,
+    "x86_vga_modey_cache_offs": 0,
+    "x86_vga_modey_lost_cache": 0,
+    "x86_vga_modey_lost_hi": 0,
+    "x86_vga_modey_lost_lo": 4294967295,
+    "x86_vga_modey_lost_nocache": 0,
+    "x86_vga_planar_lost": 269135,
+    "x86_video_mode_byte": 13
+  }
+}

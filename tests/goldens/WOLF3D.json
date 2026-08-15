@@ -1,0 +1,80 @@
+{
+  "because": "With the AdLib/OPL timer probe now succeeding (x86_io.c ISA bus time), WOLF3D's SD_Startup takes its SOUND-PRESENT path -- it zeroes all 245 FM registers, probes the Sound Blaster, and installs its own timer-0 rate -- so its intro sequence advances FURTHER by the golden's fixed 250,000,000-instruction capture point: the credits screen has already given way to the title screen. The previous golden is not wrong, it is a picture of a machine with no sound card. Proven stable first: golden_screens.py repeat --runs 3 gave three identical frames.",
+  "history": [
+    {
+      "because": "first capture",
+      "insns": 250000000,
+      "renderer": "Mode Y (unchained 13h)",
+      "sha256": "ed1292d37d8f18cd8bb2aae8987a2b43fc12990b066292ace7648fabbc0561a2",
+      "shows": "Wolfenstein 3D id Software credits screen in Mode Y (unchained 13h): red field, the id logo blitted from off-screen VRAM at the top, all eight credit lines legible in yellow/blue/white. Verified by eye against the DOSBox-X reference layout.",
+      "state": "verified",
+      "timeline": "timelines/start-preselected-game.tl",
+      "title": "WOLF3D",
+      "verified_at": "2026-08-14T16:55:38+02:00",
+      "verified_by": "agent-QueueB (viewed at capture)",
+      "witness": {
+        "clut_src": "ext_clut (256 entries)",
+        "frames_rendered": 1281,
+        "guest_insns_total": 251266988,
+        "ltdc": {
+          "fmt": 5,
+          "lines": 240,
+          "pitch": 320
+        },
+        "x86_arena_largest": 12288,
+        "x86_vga_ega_card_offsets": 0,
+        "x86_vga_latch_miss": 768,
+        "x86_vga_modey_lost_cache": 16896,
+        "x86_vga_modey_lost_nocache": 0,
+        "x86_vga_planar_lost": 18432,
+        "x86_video_mode_byte": 19
+      }
+    }
+  ],
+  "insns": 250000000,
+  "renderer": "Mode Y (unchained 13h)",
+  "sha256": "c328601ab5fb8c6f75cfd80f93c2256b0813f8651761865e819afcb03c80c45a",
+  "shows": "Wolfenstein 3D shareware TITLE screen in Mode Y (unchained 13h): grey corridor, guard at left with pistol, soldier at centre, the red/steel 'Wolfenstein 3-D' logo across the top and the id Software Inc. Production credit lower right. Viewed at capture and compared against the DOSBox-X reference layout.",
+  "state": "verified",
+  "timeline": "timelines/start-preselected-game.tl",
+  "title": "WOLF3D",
+  "verified_at": "2026-08-15T11:44:49+02:00",
+  "verified_by": "agent-sb-detect",
+  "witness": {
+    "clut_src": "ext_clut (256 entries)",
+    "crtc_offset": 40,
+    "crtc_start": 0,
+    "frames_rendered": 1270,
+    "guest_insns_total": 250138226,
+    "guest_ram_pages": 156,
+    "guest_ram_pages_short": 4,
+    "ltdc": {
+      "fmt": 5,
+      "lines": 240,
+      "pitch": 320
+    },
+    "row_pitch": 80,
+    "x86_arena_largest": 12288,
+    "x86_dma2d_blits": null,
+    "x86_dma2d_fallback": null,
+    "x86_dma2d_selftest": null,
+    "x86_dma2d_waits": null,
+    "x86_pg_donated": 0,
+    "x86_pg_evictions": 0,
+    "x86_pg_frames_total": 156,
+    "x86_pg_grow_signals": 2438,
+    "x86_pg_reserve_eff": 112,
+    "x86_pg_resident_peak": 104,
+    "x86_pg_shrink_signals": 0,
+    "x86_pg_wb_file": 0,
+    "x86_vga_ega_card_offsets": 0,
+    "x86_vga_latch_miss": 512,
+    "x86_vga_modey_cache_offs": 15616,
+    "x86_vga_modey_lost_cache": 0,
+    "x86_vga_modey_lost_hi": 0,
+    "x86_vga_modey_lost_lo": 4294967295,
+    "x86_vga_modey_lost_nocache": 0,
+    "x86_vga_planar_lost": 1280,
+    "x86_video_mode_byte": 19
+  }
+}

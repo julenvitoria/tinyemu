@@ -1,0 +1,60 @@
+{
+  "because": "the previous capture point (21.4 M insns) had no mask, so the PIT-driven cat sprite made the gate fail on a moving cat rather than on a defect; re-captured at 14 M with the cat's band masked and reproducibility proven over 3 runs",
+  "history": [
+    {
+      "because": "first capture",
+      "insns": 20000000,
+      "renderer": "CGA mode 4",
+      "sha256": "ffa3cf41b208c169c367248e842cdb5188c47f99d9e208b9aa9b0ca77cf97bec",
+      "shows": "Alley Cat title screen in CGA mode 4: magenta/cyan palette, 'IBM PRESENTS / Alley Cat (TM) / By Bill Williams', the fence and six dustbins, cat sprite at upper left, IBM 1984 copyright line. Verified by eye.",
+      "state": "verified",
+      "timeline": "timelines/start-preselected-game.tl",
+      "title": "ALLEYCAT",
+      "verified_at": "2026-08-14T16:55:51+02:00",
+      "verified_by": "agent-QueueB (viewed at capture)",
+      "witness": {
+        "clut_src": "firmware active_clut",
+        "frames_rendered": 127,
+        "guest_insns_total": 21017642,
+        "ltdc": {
+          "fmt": 5,
+          "lines": 240,
+          "pitch": 320
+        },
+        "x86_arena_largest": 45056,
+        "x86_vga_ega_card_offsets": 0,
+        "x86_vga_latch_miss": 0,
+        "x86_vga_modey_lost_cache": 0,
+        "x86_vga_modey_lost_nocache": 0,
+        "x86_vga_planar_lost": 0,
+        "x86_video_mode_byte": 4
+      }
+    }
+  ],
+  "insns": 14000000,
+  "renderer": "CGA mode 4",
+  "sha256": "406c8040f361ab500a780b40433ca43dc1a2f8a22ed685bd721435ed83af0957",
+  "shows": "Alley Cat title screen in CGA mode 4: magenta/cyan palette, 'IBM PRESENTS / Alley Cat (TM) / By Bill Williams', the fence and six dustbins, the words KILL/LOVE/THEM/MUSICES/CAT painted on the fence, and the IBM 1984 copyright line. The cat sprite band (y=108..134) is masked. Verified by eye.",
+  "state": "verified",
+  "timeline": "timelines/start-preselected-game.tl",
+  "title": "ALLEYCAT",
+  "verified_at": "2026-08-14T16:59:48+02:00",
+  "verified_by": "agent-QueueB (viewed at capture)",
+  "witness": {
+    "clut_src": "firmware active_clut",
+    "frames_rendered": 97,
+    "guest_insns_total": 14076957,
+    "ltdc": {
+      "fmt": 5,
+      "lines": 240,
+      "pitch": 320
+    },
+    "x86_arena_largest": 45056,
+    "x86_vga_ega_card_offsets": 0,
+    "x86_vga_latch_miss": 0,
+    "x86_vga_modey_lost_cache": 0,
+    "x86_vga_modey_lost_nocache": 0,
+    "x86_vga_planar_lost": 0,
+    "x86_video_mode_byte": 4
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "_comment": [
+    "What the golden-screenshot gate covers. Driven by scripts/golden_screens.py.",
+    "",
+    "Every screen here is deliberately STATIC at the capture point -- a title",
+    "screen or a menu waiting for input -- so that the instruction-count capture",
+    "point lands on the same picture on a fast host and a slow one. A screen that",
+    "is animating cannot be a golden without a tolerance so wide it stops being a",
+    "gate.",
+    "",
+    "'insns' is guest_insns_total: the deterministic capture point. 'tolerance' is",
+    "a per-channel value, and 'max_diff_pct' the fraction of pixels allowed past",
+    "it. Both are 0 for a screen that should be bit-identical; anything non-zero",
+    "needs a reason recorded next to it."
+  ],
+  "titles": {
+    "WOLF3D": {
+      "renderer": "Mode Y (unchained 13h)",
+      "rom": "references/game-and-watch-retro-go-sd/roms/dos/WOLF3D.dsk",
+      "timeline": "timelines/start-preselected-game.tl",
+      "insns": 250000000,
+      "tolerance": 0,
+      "max_diff_pct": 0.0
+    },
+    "ALLEYCAT": {
+      "renderer": "CGA mode 4",
+      "rom": "references/game-and-watch-retro-go-sd/roms/dos/ALLEYCAT.dsk",
+      "timeline": "timelines/start-preselected-game.tl",
+      "insns": 14000000,
+      "tolerance": 0,
+      "max_diff_pct": 0.0,
+      "mask": [
+        [
+          0,
+          108,
+          319,
+          134
+        ],
+        [
+          0,
+          200,
+          319,
+          222
+        ]
+      ],
+      "mask_reason": "Two bands, both driven by guest TIME rather than by the instruction stream, so no instruction-count capture point can freeze them. (1) y=108..134: the cat sprite walks the fence off the PIT tick, and two runs at the same guest_insns_total put it 30-55 px apart. (2) y=200..222: the copyright line CYCLES between '(C) Copyright IBM Corp. 1984' and '(C) Copyright SynSoft(TM) 1984' on a timer -- a capture is a coin flip between two equally correct screens. Differences inside both bands are still counted and printed; everything else -- title text, fence, dustbins, the words painted on it, palette -- gates exactly."
+    },
+    "KEEN4": {
+      "renderer": "EGA 0Dh",
+      "rom": "references/game-and-watch-retro-go-sd/roms/dos/KEEN4.dsk",
+      "timeline": "timelines/start-preselected-game.tl",
+      "insns": 200000000,
+      "tolerance": 0,
+      "max_diff_pct": 0.0
+    }
+  }
+}

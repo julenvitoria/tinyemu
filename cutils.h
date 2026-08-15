@@ -91,7 +91,9 @@ static inline uint32_t bswap_32(uint32_t v)
         ((v & 0x0000ff00) <<  8) | ((v & 0x000000ff) << 24);
 }
 #else
-#include <byteswap.h>
+#define bswap_16(x) __builtin_bswap16(x)
+#define bswap_32(x) __builtin_bswap32(x)
+#define bswap_64(x) __builtin_bswap64(x)
 #endif
 
 static inline uint16_t get_le16(const uint8_t *ptr)
