@@ -1677,6 +1677,21 @@ sector. `--autoexec` writes a one-line `AUTOEXEC.BAT`. The guest is told `C:`
 for a hard-disk image and `A:` for a floppy (INT 21h AH=19h), so a title that
 refuses to run from floppy (Risky Woods) needs `--size-mb`. Needs mtools.
 
+### `lucasarts_unpack.py` / `so3_to_sou.py` — LucasArts install sets
+
+```bash
+python3 -I scripts/lucasarts_unpack.py --out build/run/g4/ext \
+    build/run/g4/raw/PCVIQA_{A,B,C,D,E}.ND4      # parts in disk order
+python3 -I scripts/so3_to_sou.py --src .../monster.so3 --out MONSTER.SOU
+```
+
+`lucasarts_unpack.py` reads a floppy set's `LFG!` parts (the files INSTALL.EXE
+would unpack across disk swaps) straight into a folder for `make_dsk.py`; pure
+Python (a port of the public-domain blast.c), each file's size checked.
+`so3_to_sou.py` turns a ScummVM-compressed `monster.so3` back into the
+MONSTER.SOU a talkie DOS interpreter reads, every line at its original offset;
+needs ffmpeg, and is useless with a floppy EXE, which never opens the file.
+
 ### `sdcard.py` — compose the SD card
 
 `create_image()` formats the partition with plain `mformat -F` and, only if that
